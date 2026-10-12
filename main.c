@@ -37,7 +37,12 @@ void DrawState(RenderTexture2D *target, Image *stateimage) {
     if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT) ) { g -= 127; }
     if (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN) ) { r -= 127; }
     if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) { g += 127; }
-    ImageDrawPixel(stateimage, 0, 127, (Color) {r, g, 0, 128}); // dk why but a needs to be < 255 to show up on screen
+    Vector2 mousedelta = GetMouseDelta();
+    int dx = (int) (mousedelta.x + 128.);
+    if (dx < 0) dx = 0; if (dx > 255) dx = 255;
+    int dy = (int) (mousedelta.y + 128.);
+    if (dy < 0) dy = 0; if (dy > 255) dy = 255;
+    ImageDrawPixel(stateimage, 0, 127, (Color) {r, g, dx, dy});
 
     Texture2D state = LoadTextureFromImage(*stateimage);
     BeginTextureMode(*target); {
@@ -67,8 +72,6 @@ int main(void) {
 
     int frame = 0;
     int frameLoc = GetShaderLocation(shader, "frame");
-    Vector2 mouse;
-    int mouseLoc = GetShaderLocation(shader, "mouse");
     int inputLoc = GetShaderLocation(shader, "inp");
 
     SetTargetFPS(120);
@@ -79,10 +82,6 @@ int main(void) {
 
         frame++;
         SetShaderValue(shader, frameLoc, &frame, SHADER_UNIFORM_INT);
-        mouse = GetMousePosition();
-        mouse.x += WIDTH; // dont even ask
-        mouse.y -= 0.5*HEIGHT; // i couldnt give a good explanation...
-        SetShaderValue(shader, mouseLoc, &mouse, SHADER_UNIFORM_VEC2);
 
         DrawState(inTarget, &state);
         BeginTextureMode(*outTarget); {

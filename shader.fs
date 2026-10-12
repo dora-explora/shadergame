@@ -6,7 +6,6 @@ in vec4 fragColor;
 out vec4 color;
 
 uniform int frame;
-uniform vec2 mouse;
 
 uniform sampler2D inp;
 
@@ -38,11 +37,11 @@ float rand(vec2 co){
   return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
 }
 
+// the rest are straight from my ass
 float fullrand(in vec2 co, in int fr, in float seed) {
-    return rand(co * rand(mod(float(fr), 30.2376) * seed));
+    return rand(co * sinrand(mod(float(fr), 30.2376) * seed));
 }
 
-// both straight from my ass
 bool brand(in float seed) { return (rand(seed) < 0.5); }
 
 float fmod(in float n, in float m) {
@@ -56,83 +55,92 @@ vec4 state(in ivec2 ipos) {
     return texture(inp, vec2(ipos) / RES);
 }
 
-bool map(in ivec2 ipos) { return state(ipos) == WHITE; }
-bool map(in int x, in int y) { return state(ivec2(x, y)) == WHITE; }
+bool map(in ivec2 ipos) { return state(ipos).a == 1; }
+bool map(in int x, in int y) { return state(ivec2(x, y)).a == 1; }
 
 /* MOVEMENT */
-const float MOVESPEED = 0.08 / 128.;
-const vec2 DEFAULT_POS = vec2(6., 122.);
+const float MOVESPEED = 0.2 / 128.;
+const vec4 DEFAULT_POS = vec4(6./128., 0., 122./128., 1.);
 
-const float H_SENS = 1.5;
-const float Y_SENS = 2.;
-
-vec4 handlemovement(in vec4 back, in vec2 mousepos) {
-    if (back == vec4(0.)) { return vec4(DEFAULT_POS.x/128., 0., DEFAULT_POS.y/128., 1.); }
+vec4 handlemovement(in vec4 back) {
+    if (back == vec4(0.)) { return DEFAULT_POS; }
     vec2 pos = back.xz;
     float movestrength = MOVESPEED*(state(STATE_MOVE).r - DEFAULT);
-    float theta = state(STATE_ROT).r + 3.14 * H_SENS*mousepos.x + 0.5;
-    vec2 move = movestrength*vec2(cos(theta), sin(theta));
+    float theta = state(STATE_ROT).r + 0.5;
+    vec2 move = movestrength*vec2(cos(theta), RES.y/RES.x*sin(theta)); // I DONT KNOW WHY I REALLY HAVE NO CLUE
     // pos += move;
     if (!map(ivec2(floor(pos + move)))) { pos += move; }
     return vec4(pos.x, back.y, pos.y, back.w);
 }
 
+const vec4 DEFAULT_ROT = vec4(4.65, 0.9, 0., 1.);
 const float ROTSPEED = 0.025;
+const float H_SENS = 0.4;
+const float Y_SENS = 0.8;
 
 vec4 handlerotation(in vec4 back) {
-    if (back == vec4(0.)) { return BLACK; }
-    float rotation = state(STATE_MOVE).g;
-    back.x += ROTSPEED*(rotation - DEFAULT);
-    back.x = mod(back.x, 6.28);
+    if (back == vec4(0.)) { return DEFAULT_ROT; }
+    vec4 move = state(STATE_MOVE);
+    back.r += ROTSPEED*(move.g - DEFAULT) + H_SENS*(move.b - DEFAULT);
+    back.r = mod(back.r, 6.28);
+    back.g += Y_SENS*(move.a - DEFAULT);
+    back.g = clamp(back.g, -0.5, 0.5);
     return back;
 }
 
 /* RENDERING */
 const float RAY_STEP = 0.05;
-const float DOT_CHANCE = 0.0015;
+ const float DOT_CHANCE = 0.004;
+ // const float DOT_CHANCE = 1.;
 const float WALL_HEIGHT = 2.0;
 const float MAX_DIST = 20.;
 
 
 // figured this out all on my own, without desmos :3
-vec4 draw(in vec2 mousepos) {
+vec4 draw() {
     if (fullrand(fragTexCoord, frame, 1.) < (1. - DOT_CHANCE)) { return vec4(0.); }
-    vec3 rduv = vec3(0.);
-    float theta = state(STATE_ROT).r;
-    theta += 3.14 * (H_SENS*mousepos.x + 0.3*fragTexCoord.x);
-    rduv.x = cos(theta);
-    rduv.x *= RES.x/RES.y;
-    rduv.z = sin(theta);
-    rduv.y += Y_SENS*mousepos.y + fragTexCoord.y;
+    vec4 rot = state(STATE_ROT);
+    float theta = rot.r + fragTexCoord.x;
+    vec3 rduv = vec3(
+        cos(theta) * RES.x/RES.y,
+        fragTexCoord.y - 0.5 + rot.g,
+        sin(theta)
+    );
     vec3 rd = normalize(rduv);
     vec3 ro = state(STATE_POS).xyz * 128.;
     vec3 r;
     for (r = ro; r.y < WALL_HEIGHT && r.y > -WALL_HEIGHT; r += RAY_STEP*rd) {
         if (map(ivec2(floor(r.xz)))) {
             float darkness = distance(r, ro)/(MAX_DIST);
+	    // darkness += fullrand(fragTexCoord, frame, 1.45) * 3./MAX_DIST;
             if (fullrand(fragTexCoord, frame, 1.83) < sqrt(darkness)) { return vec4(0.); }
             return vec4(1. - 0.5*darkness, 0.5 - 10.*(darkness - 0.15), 0., 1.);
         }
         if (distance(r, ro) > MAX_DIST) { return vec4(0.); }
     }
-    return vec4(0.5, 0.7 - 10.*(distance(r, ro)/MAX_DIST - 0.15), 0.7, 1.);
+    return vec4(0.5, 0.55 - 10.*(distance(r, ro)/MAX_DIST - 0.15), 0.7, 1.);
 }
 
 void main() {
     vec2 pos = fragTexCoord;
     vec4 back = texture(inp, pos);
     ivec2 ipos = ivec2(pos * RES);
-    vec2 mousepos = mouse == vec2(0.) ? vec2(-1., 0.) : mouse/RES;
-    mousepos.y = clamp(mousepos.y, -0.5, 0.);
     if (ipos.x < MINIMAP && ipos.y < MINIMAP) {
-        if (ipos == STATE_POS) { color = handlemovement(back, mousepos);
-        } else if (ipos == STATE_ROT) { color = handlerotation(back);
-        } else if (distance(ivec2(128.*state(STATE_POS).xy), ipos) < 5) { color == vec4(0., 1., 0., 1.);
-        } else { color = back; }
+        if (ipos == STATE_POS) {
+            color = handlemovement(back);
+        } else if (ipos == STATE_ROT) {
+            color = handlerotation(back);
+        // } else if (distance(ivec2(128.*state(STATE_POS).xz), ipos) < 3 && back != WHITE) {
+            // color = vec4(0., 1., 1., 0.3);
+        // } else if (back == vec4(0., 1., 1., 0.3)) {
+            // color = BLACK;
+        } else {
+            color = back;
+        }
         return;
     }
 
-    vec4 drawcolor = draw(mousepos);
+    vec4 drawcolor = draw();
     if (drawcolor.a == 1.) {
         color = drawcolor;
     } else if (back.a > 0.15) {

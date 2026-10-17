@@ -1,5 +1,6 @@
 #include <raylib.h>
 #include <rlgl.h>
+#include <stdint.h>
 // #include <stdio.h> // for debug
 
 const int WIDTH = 1920;
@@ -30,7 +31,15 @@ RenderTexture2D LoadRenderTextureF32(int w, int h)
     return rt;
 }
 
-void DrawState(RenderTexture2D *target, Image *stateimage) {
+void DrawState(RenderTexture2D *target, Image *stateimage, uint32_t frame) {
+    Color framecolor = (Color) {
+	(frame & 0xFF000000) >> 24,
+	(frame & 0x00FF0000) >> 16,
+	(frame & 0x0000FF00) >> 8,
+	(frame & 0x000000FF)
+    };
+    ImageDrawPixel(stateimage, 0, 127, framecolor);
+
     unsigned char r = 128;
     unsigned char g = 128;
     if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)   ) { r += 127; }
@@ -42,7 +51,7 @@ void DrawState(RenderTexture2D *target, Image *stateimage) {
     if (dx < 0) dx = 0; if (dx > 255) dx = 255;
     int dy = (int) (mousedelta.y + 128.);
     if (dy < 0) dy = 0; if (dy > 255) dy = 255;
-    ImageDrawPixel(stateimage, 0, 127, (Color) {r, g, dx, dy});
+    ImageDrawPixel(stateimage, 1, 127, (Color) {r, g, dx, dy});
 
     Texture2D state = LoadTextureFromImage(*stateimage);
     BeginTextureMode(*target); {
@@ -70,20 +79,19 @@ int main(void) {
     RenderTexture2D *outTarget = &targetB;
     Image state = LoadImage("assets/map.png");
 
-    int frame = 0;
-    int frameLoc = GetShaderLocation(shader, "frame");
+    uint32_t frame = 0;
     int inputLoc = GetShaderLocation(shader, "inp");
 
-    SetTargetFPS(120);
+    SetTargetFPS(60);
 
     while (!WindowShouldClose())
     {
         inTarget = outTarget;
 
         frame++;
-        SetShaderValue(shader, frameLoc, &frame, SHADER_UNIFORM_INT);
+        // SetShaderValue(shader, frameLoc, &frame, SHADER_UNIFORM_UINT);
 
-        DrawState(inTarget, &state);
+        DrawState(inTarget, &state, frame);
         BeginTextureMode(*outTarget); {
             BeginShaderMode(shader); {
                 SetShaderValueTexture(shader, inputLoc, inTarget->texture);

@@ -98,7 +98,7 @@ vec3 drawcoin(in vec3 r) {
 	    if (state(pos) == BLUE) {
 		float coindist = sqrt(distance(vec3(pos.x, 0., pos.y) + vec3(0.5), r));
 		return vec3(
-		    max(1.8 - coindist, -0.1),
+		    max(1.8 - coindist, 0.),
 		    max(2.2 - coindist, 0.),
 		    max(2.1 - coindist, 0.)
 		);
@@ -109,7 +109,7 @@ vec3 drawcoin(in vec3 r) {
 }
 
 vec4 handlecoin() {
-    if (ivec2(state(STATE_POS).xz * 128.) == ivec2(fragTexCoord * RES)) {
+    if (distance(state(STATE_POS).xz * 128., fragTexCoord * RES) < 2.) {
         return BLACK;
     } else {
         return BLUE;
@@ -118,13 +118,13 @@ vec4 handlecoin() {
 
 /* RENDERING */
 const float RAY_STEP = 0.05;
-const float DOT_CHANCE = 0.003;
+const float DOT_CHANCE = 0.004;
 const float WALL_HEIGHT = 2.0;
 const float MAX_DIST = 20.;
 
 // figured this out all on my own, without desmos :3
 vec4 draw() {
-    // if (fullrand(0.3) < (1. - DOT_CHANCE)) { return vec4(0.); }
+    if (fullrand(0.3) < (1. - DOT_CHANCE)) { return vec4(0.); }
     vec4 rot = state(STATE_ROT);
     float theta = rot.r + fragTexCoord.x;
     vec3 rduv = vec3(
@@ -142,7 +142,7 @@ vec4 draw() {
         if (map(ivec2(floor(r.xz)))) {
             if (fullrand(0.41) < sqrt(dist)) { return vec4(0.); }
 	    vec3 coin = drawcoin(r);
-            return vec4(vec3(1. - 0.2*dist, 0.5 - 10.*(dist - 0.15), 0.) + coin, 1.);
+            return vec4(vec3(1. - 0.2*dist, 0.5 - 10.*(dist - 0.15), 0.) + 1.5*coin, 1.);
         }
         if (distance(r, ro) > MAX_DIST) { return vec4(0.); }
     }

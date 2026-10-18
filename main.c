@@ -31,14 +31,14 @@ RenderTexture2D LoadRenderTextureF32(int w, int h)
     return rt;
 }
 
-void DrawState(RenderTexture2D *target, Image *stateimage, uint32_t frame) {
-    Color framecolor = (Color) {
+void DrawState(RenderTexture2D *target, Image *bg, uint32_t frame) {
+    Color framecol = (Color) {
 	(frame & 0xFF000000) >> 24,
 	(frame & 0x00FF0000) >> 16,
 	(frame & 0x0000FF00) >> 8,
 	(frame & 0x000000FF)
     };
-    ImageDrawPixel(stateimage, 0, 127, framecolor);
+    ImageDrawPixel(bg, 0, MINIMAP-1, framecol);
 
     unsigned char r = 128;
     unsigned char g = 128;
@@ -51,9 +51,9 @@ void DrawState(RenderTexture2D *target, Image *stateimage, uint32_t frame) {
     if (dx < 0) dx = 0; if (dx > 255) dx = 255;
     int dy = (int) (mousedelta.y + 128.);
     if (dy < 0) dy = 0; if (dy > 255) dy = 255;
-    ImageDrawPixel(stateimage, 1, 127, (Color) {r, g, dx, dy});
+    ImageDrawPixel(bg, 1, MINIMAP-1, (Color) {r, g, dx, dy});
 
-    Texture2D state = LoadTextureFromImage(*stateimage);
+    Texture2D state = LoadTextureFromImage(*bg);
     BeginTextureMode(*target); {
         DrawTexturePro(
             state,
@@ -77,7 +77,8 @@ int main(void) {
     RenderTexture2D targetB = LoadRenderTextureF32(WIDTH, HEIGHT);
     RenderTexture2D *inTarget = &targetA;
     RenderTexture2D *outTarget = &targetB;
-    Image state = LoadImage("assets/map.png");
+    Image map = LoadImage("assets/map.png");
+    Image blank = GenImageColor(MINIMAP, MINIMAP, BLANK);
 
     uint32_t frame = 0;
     int inputLoc = GetShaderLocation(shader, "inp");
@@ -91,7 +92,7 @@ int main(void) {
         frame++;
         // SetShaderValue(shader, frameLoc, &frame, SHADER_UNIFORM_UINT);
 
-        DrawState(inTarget, &state, frame);
+        DrawState(inTarget, frame == 1 ? &map : &blank, frame);
         BeginTextureMode(*outTarget); {
             BeginShaderMode(shader); {
                 SetShaderValueTexture(shader, inputLoc, inTarget->texture);
